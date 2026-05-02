@@ -10,6 +10,11 @@ pub struct Task {
     pub due: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct TaskList {
+    tasks: Vec<Task>,
+}
+
 pub fn get_storage_path() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join(".dotdo").join("tasks.json"))
 }
@@ -21,7 +26,8 @@ pub fn fetch_active_monsters() -> Vec<Task> {
     };
 
     let data = fs::read_to_string(path).unwrap_or_default();
-    let tasks: Vec<Task> = serde_json::from_str(&data).unwrap_or_default();
+    let task_list: TaskList = serde_json::from_str(&data).unwrap_or_default();
+    let tasks = task_list.tasks;
 
     // Filter for monsters that are actually a threat
     tasks
