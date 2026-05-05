@@ -133,6 +133,9 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                         return true;
                     }
                 }
+                KeyCode::Char('p') | KeyCode::Char('P') => {
+                    app.is_paused = !app.is_paused;
+                }
                 KeyCode::Char('q') => return true,
                 _ => {}
             }
@@ -157,6 +160,9 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                 KeyCode::Char('s') | KeyCode::Esc => {
                     app.state = Scene::March;
                 }
+                KeyCode::Char('p') | KeyCode::Char('P') => {
+                    app.is_paused = !app.is_paused;
+                }
                 KeyCode::Char('q') => return true,
                 _ => {}
             }
@@ -178,6 +184,9 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                 }
                 KeyCode::Char('f') | KeyCode::Esc => {
                     app.state = Scene::March;
+                }
+                KeyCode::Char('p') | KeyCode::Char('P') => {
+                    app.is_paused = !app.is_paused;
                 }
                 KeyCode::Char('q') => return true,
                 _ => {}

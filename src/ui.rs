@@ -120,7 +120,7 @@ const KNIGHT: &str = "K";
 const MONSTER: &str = "M";
 const SLAIN: &str = "X";
 
-pub fn render(f: &mut Frame, app: &App) {
+pub fn render(f: &mut Frame, app: &mut App) {
     match app.state {
         Scene::Setup => draw_setup(f, app),
         Scene::Tavern => draw_tavern(f, app),
@@ -173,9 +173,13 @@ pub fn render(f: &mut Frame, app: &App) {
             draw_selection(f, app);
         }
     }
+
+    if app.is_paused {
+        draw_paused_overlay(f);
+    }
 }
 
-pub fn draw_setup(f: &mut Frame, app: &App) {
+pub fn draw_setup(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -226,14 +230,14 @@ pub fn draw_setup(f: &mut Frame, app: &App) {
     f.render_widget(footer, chunks[2]);
 }
 
-pub fn draw_tavern(f: &mut Frame, app: &App) {
+pub fn draw_tavern(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
         .constraints([
             Constraint::Length(11), // Tavern ASCII
-            Constraint::Min(10),    // Bounty Board
-            Constraint::Length(3),  // Instructions
+            Constraint::Length(9),  // Bounty Board (fixed height for 5-6 items)
+            Constraint::Min(3),     // Instructions / Extra space
         ])
         .split(f.area());
 
@@ -259,54 +263,32 @@ pub fn draw_tavern(f: &mut Frame, app: &App) {
 
     // 1. Dotdo Tasks
     for (i, task) in app.available_tasks.iter().enumerate() {
-        let style = if i == app.cursor_pos {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::REVERSED)
-        } else {
-            Style::default()
-        };
+        let style = Style::default();
         let tagged = if app.selected_indices.contains(&i) { " [X] " } else { " [ ] " };
         items.push(ListItem::new(format!("{}{}", tagged, task.title)).style(style));
     }
 
     // 2. Custom Monsters
     let tasks_len = app.available_tasks.len();
-    for (i, name) in app.custom_monsters.iter().enumerate() {
-        let idx = tasks_len + i;
-        let style = if idx == app.cursor_pos {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::REVERSED)
-        } else {
-            Style::default()
-        };
+    for (_, name) in app.custom_monsters.iter().enumerate() {
+        let style = Style::default();
         items.push(ListItem::new(format!(" [X] {}", name)).style(style));
     }
 
     // 3. [+] Button
     let custom_len = app.custom_monsters.len();
     let plus_idx = tasks_len + custom_len;
-    let plus_style = if app.cursor_pos == plus_idx {
-        Style::default().fg(Color::Green).add_modifier(Modifier::REVERSED)
-    } else {
-        Style::default().fg(Color::Green)
-    };
+    let plus_style = Style::default().fg(Color::Green);
     items.push(ListItem::new(" [+] Add Custom Monster").style(plus_style));
 
     // 4. [START QUEST] Button
-    let start_idx = plus_idx + 1;
     let selected_count = app.selected_indices.len() + custom_len;
     let can_start = selected_count == app.monsters_goal as usize;
     
-    let start_style = if app.cursor_pos == start_idx {
-        if can_start {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::REVERSED | Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::REVERSED)
-        }
+    let start_style = if can_start {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        if can_start {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        }
+        Style::default().fg(Color::DarkGray)
     };
     
     let start_text = if can_start {
@@ -318,11 +300,22 @@ pub fn draw_tavern(f: &mut Frame, app: &App) {
     };
     items.push(ListItem::new(start_text).style(start_style));
 
+    app.tavern_state.select(Some(app.cursor_pos));
+
+    let mut bounty_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" Bounty Board (Goal: {}) ", app.monsters_goal));
+    
+    if items.len() > 7 {
+        bounty_block = bounty_block.title_bottom(Line::from(" [...] ").alignment(Alignment::Center));
+    }
+
     let bounty_board = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title(format!(" Bounty Board (Goal: {}) ", app.monsters_goal)))
+        .block(bounty_block)
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::REVERSED))
         .highlight_symbol("> ");
     
-    f.render_widget(bounty_board, chunks[1]);
+    f.render_stateful_widget(bounty_board, chunks[1], &mut app.tavern_state);
 
     let instructions = Paragraph::new("[Up/Down] Navigate | [Space/Enter] Select/Action | [Q] Quit")
         .alignment(Alignment::Center)
@@ -330,7 +323,7 @@ pub fn draw_tavern(f: &mut Frame, app: &App) {
     f.render_widget(instructions, chunks[2]);
 }
 
-pub fn draw_naming(f: &mut Frame, app: &App) {
+pub fn draw_naming(f: &mut Frame, app: &mut App) {
     let area = f.area();
     let vertical = Layout::default()
         .direction(Direction::Vertical)
@@ -347,7 +340,7 @@ pub fn draw_naming(f: &mut Frame, app: &App) {
     f.render_widget(input, target);
 }
 
-pub fn draw_selection(f: &mut Frame, app: &App) {
+pub fn draw_selection(f: &mut Frame, app: &mut App) {
     let area = f.area();
     
     // Create a centered rect for the overlay
@@ -369,10 +362,8 @@ pub fn draw_selection(f: &mut Frame, app: &App) {
         ])
         .split(vertical[1])[1];
 
-    let monsters: Vec<ListItem> = app.monsters.iter().enumerate().map(|(i, m)| {
-        let style = if i == app.cursor_pos {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::REVERSED)
-        } else if m.is_slain {
+    let monsters: Vec<ListItem> = app.monsters.iter().map(|m| {
+        let style = if m.is_slain {
             Style::default().fg(Color::DarkGray).add_modifier(Modifier::CROSSED_OUT)
         } else {
             Style::default()
@@ -381,17 +372,20 @@ pub fn draw_selection(f: &mut Frame, app: &App) {
         ListItem::new(format!("{}{}", status, m.name)).style(style)
     }).collect();
 
+    app.selection_state.select(Some(app.cursor_pos));
+
     let list = List::new(monsters)
         .block(Block::default().borders(Borders::ALL)
             .title(format!(" SELECT TARGET | Time Left: {} ", app.get_time_left()))
             .style(Style::default().fg(Color::Yellow)))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::REVERSED))
         .highlight_symbol("> ");
 
     f.render_widget(Clear, target_area); // Clear the background
-    f.render_widget(list, target_area);
+    f.render_stateful_widget(list, target_area, &mut app.selection_state);
 }
 
-pub fn render_march(f: &mut Frame, app: &App, area: Rect) {
+pub fn render_march(f: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(8), Constraint::Min(0)])
@@ -495,7 +489,7 @@ pub fn render_march(f: &mut Frame, app: &App, area: Rect) {
 
 
 
-pub fn render_battle(f: &mut Frame, app: &App, monster_idx: usize) {
+pub fn render_battle(f: &mut Frame, app: &mut App, monster_idx: usize) {
     let monster = &app.monsters[monster_idx];
     let area = f.area();
     
@@ -567,7 +561,7 @@ pub fn render_battle(f: &mut Frame, app: &App, monster_idx: usize) {
     }
 
     let text = format!(
-        "\n\nYOU ARE FIGHTING: {} [{}]\n\n[S] SLAY | [F] FLEE | [Q] QUIT",
+        "\n\nYOU ARE FIGHTING: {} [{}]\n\n[S] SLAY | [F] FLEE | [P] PAUSE | [Q] QUIT",
         monster.name.to_uppercase(),
         monster.monster_type.to_uppercase()
     );
@@ -589,7 +583,7 @@ pub fn render_battle(f: &mut Frame, app: &App, monster_idx: usize) {
 }
 
 
-pub fn render_footer(f: &mut Frame, app: &App, area: Rect) {
+pub fn render_footer(f: &mut Frame, app: &mut App, area: Rect) {
     let mut keys = String::from("[S] Slay | [P] Pause | [Q] Quit");
     
     // Add the explicit completion option only when quest is finished
@@ -612,7 +606,7 @@ pub fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(footer, area);
 }
 
-pub fn render_sidebar(f: &mut Frame, app: &App, area: Rect) {
+pub fn render_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
@@ -657,4 +651,33 @@ pub fn render_sidebar(f: &mut Frame, app: &App, area: Rect) {
     let legend = Paragraph::new(legend_text)
         .block(Block::default().borders(Borders::ALL).title(" Legend "));
     f.render_widget(legend, chunks[1]);
+}
+
+fn draw_paused_overlay(f: &mut Frame) {
+    let area = f.area();
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(45),
+            Constraint::Length(3),
+            Constraint::Percentage(45),
+        ])
+        .split(area);
+    
+    let target_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(30),
+            Constraint::Percentage(40),
+            Constraint::Percentage(30),
+        ])
+        .split(vertical[1])[1];
+
+    let paused_text = Paragraph::new("[ PAUSED ]")
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK))
+        .block(Block::default().borders(Borders::ALL).style(Style::default().fg(Color::Yellow)));
+
+    f.render_widget(Clear, target_area);
+    f.render_widget(paused_text, target_area);
 }

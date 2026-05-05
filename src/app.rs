@@ -35,6 +35,9 @@ pub struct App {
     pub custom_monsters: Vec<String>,
     pub naming_input: String,
     pub animation: Option<Animation>,
+    pub is_paused: bool,
+    pub selection_state: ratatui::widgets::ListState,
+    pub tavern_state: ratatui::widgets::ListState,
 }
 
 impl App {
@@ -59,11 +62,18 @@ impl App {
             custom_monsters: Vec::new(),
             naming_input: String::new(),
             animation: None,
+            is_paused: false,
+            selection_state: ratatui::widgets::ListState::default(),
+            tavern_state: ratatui::widgets::ListState::default(),
         }
     }
 
     // Call this every time a "minute" or "tick" passes
     pub fn generate_row(&mut self) {
+        if self.is_paused {
+            return;
+        }
+
         if let Some(ref mut anim) = self.animation {
             match anim {
                 Animation::Slash { frame, .. } => {

@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut last_tick = Instant::now();
 
     loop {
-        terminal.draw(|f| ui::render(f, &app))?;
+        terminal.draw(|f| ui::render(f, &mut app))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
