@@ -15,7 +15,6 @@ pub struct Monster {
     pub name: String,
     pub is_slain: bool,
     pub monster_type: String,
-    pub dotdo_id: Option<u32>,
     pub art_idx: usize,
 }
 

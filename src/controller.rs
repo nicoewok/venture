@@ -1,6 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use crate::app::{App, Scene};
-use std::process::Command;
 
 pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
     match app.state {
@@ -78,7 +77,6 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                                     name: task.title.clone(),
                                     is_slain: false,
                                     monster_type: "Bounty".to_string(),
-                                    dotdo_id: Some(task.id),
                                     art_idx: idx % 5,
                                 });
                             }
@@ -87,7 +85,6 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                                     name: name.clone(),
                                     is_slain: false,
                                     monster_type: "Wild".to_string(),
-                                    dotdo_id: None,
                                     art_idx: (tasks_len + i) % 5,
                                 });
                             }
@@ -173,12 +170,6 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                     if !app.monsters[idx].is_slain {
                         app.monsters[idx].is_slain = true;
                         app.slain_count += 1;
-                        if let Some(id) = app.monsters[idx].dotdo_id {
-                            let _ = Command::new("dotdo")
-                                .arg("done")
-                                .arg(id.to_string())
-                                .spawn();
-                        }
                         app.animation = Some(crate::ui::Animation::Slash { frame: 0 });
                     }
                 }
