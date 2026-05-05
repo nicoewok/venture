@@ -8,6 +8,7 @@ pub enum Scene {
     March,
     Selection,
     Battle(usize), // Index of the monster in the active list
+    Summary,
 }
 
 pub struct Monster {
@@ -78,7 +79,7 @@ impl App {
             match anim {
                 Animation::Slash { frame, .. } => {
                     *frame += 1;
-                    if *frame > 12 {
+                    if *frame > 6 {
                         self.animation = None;
                         self.state = Scene::March;
                     }
@@ -129,6 +130,15 @@ impl App {
         let h = seconds_left / 3600;
         let m = (seconds_left % 3600) / 60;
         let s = seconds_left % 60;
+        
+        format!("{:02}:{:02}:{:02}", h, m, s)
+    }
+
+    pub fn get_time_taken(&self) -> String {
+        let seconds_taken = (self.ticks as f32 * (self.tick_rate_ms as f32 / 1000.0)) as u64;
+        let h = seconds_taken / 3600;
+        let m = (seconds_taken % 3600) / 60;
+        let s = seconds_taken % 60;
         
         format!("{:02}:{:02}:{:02}", h, m, s)
     }

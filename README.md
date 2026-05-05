@@ -71,3 +71,13 @@ Dotdo is a simple cli todo-list tool I created.
 You can find it here: [https://github.com/nicolang0416/dotdo](https://github.com/nicolang0416/dotdo)
 
 If you have dotdo installed, Venture will automatically get your active tasks and let's you select them as monsters when you start a session.
+
+
+
+### ASCII Art
+
+Alligator by [Joan G. Stark (Spunk)](https://www.asciiart.eu/art/ce227a0434b9e8ed)
+
+Wolf by [Unknown](https://www.asciiart.eu/art/80c90fbd73cd8011)
+
+Dragon by [Unknown](https://www.asciiart.eu/art/30abc3bbb104d184)

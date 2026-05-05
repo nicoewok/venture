@@ -79,7 +79,7 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                                     is_slain: false,
                                     monster_type: "Bounty".to_string(),
                                     dotdo_id: Some(task.id),
-                                    art_idx: idx % 4,
+                                    art_idx: idx % 5,
                                 });
                             }
                             for (i, name) in app.custom_monsters.iter().enumerate() {
@@ -88,7 +88,7 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                                     is_slain: false,
                                     monster_type: "Wild".to_string(),
                                     dotdo_id: None,
-                                    art_idx: (tasks_len + i) % 4,
+                                    art_idx: (tasks_len + i) % 5,
                                 });
                             }
                             app.state = Scene::March;
@@ -130,7 +130,7 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                 }
                 KeyCode::Char('c') => {
                     if app.is_quest_finished() {
-                        return true;
+                        app.state = Scene::Summary;
                     }
                 }
                 KeyCode::Char('p') | KeyCode::Char('P') => {
@@ -189,6 +189,12 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> bool {
                     app.is_paused = !app.is_paused;
                 }
                 KeyCode::Char('q') => return true,
+                _ => {}
+            }
+        }
+        Scene::Summary => {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Enter | KeyCode::Esc => return true,
                 _ => {}
             }
         }

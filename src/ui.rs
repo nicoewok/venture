@@ -73,6 +73,7 @@ pub fn render(f: &mut Frame, app: &mut App) {
             
             draw_selection(f, app);
         }
+        Scene::Summary => draw_summary(f, app),
     }
 
     if app.is_paused {
@@ -156,9 +157,9 @@ pub fn draw_selection(f: &mut Frame, app: &mut App) {
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(60),
-            Constraint::Percentage(20),
+            Constraint::Length(4),  // Top padding
+            Constraint::Fill(1),    // List area
+            Constraint::Length(4),  // Bottom padding
         ])
         .split(area);
     
@@ -383,4 +384,71 @@ fn draw_paused_overlay(f: &mut Frame) {
 
     f.render_widget(Clear, target_area);
     f.render_widget(paused_text, target_area);
+}
+
+pub fn draw_summary(f: &mut Frame, app: &mut App) {
+    let area = f.area();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(20),
+            Constraint::Min(10),
+            Constraint::Percentage(20),
+        ])
+        .split(area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" QUEST COMPLETE ")
+        .style(Style::default().fg(Color::Yellow));
+
+    let mut summary_text = vec![
+        Line::from(vec![
+            Span::styled("--- THE BARD'S TALE ---", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        ]),
+        Line::from(""),
+    ];
+
+    if app.all_monsters_slain() {
+        summary_text.push(Line::from("The Knight has vanquished all foes in the realm!"));
+    } else {
+        summary_text.push(Line::from("The Knight has reached the Citadel after a long journey."));
+    }
+
+    summary_text.push(Line::from(""));
+    summary_text.push(Line::from(vec![
+        Span::raw("Time Taken: "),
+        Span::styled(app.get_time_taken(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    ]));
+    summary_text.push(Line::from(vec![
+        Span::raw("Monsters Slain: "),
+        Span::styled(format!("{}", app.slain_count), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+    ]));
+    summary_text.push(Line::from(""));
+    
+    if !app.monsters.is_empty() {
+        summary_text.push(Line::from("The Fallen:"));
+        for m in &app.monsters {
+            if m.is_slain {
+                summary_text.push(Line::from(vec![
+                    Span::styled("  [X] ", Style::default().fg(Color::Red)),
+                    Span::raw(&m.name),
+                ]));
+            }
+        }
+    }
+
+    summary_text.push(Line::from(""));
+    summary_text.push(Line::from("The realm is safer thanks to your focus."));
+    summary_text.push(Line::from(""));
+    summary_text.push(Line::from(vec![
+        Span::styled("Press [Enter] or [Q] to return to the real world.", Style::default().add_modifier(Modifier::ITALIC))
+    ]));
+
+    let paragraph = Paragraph::new(summary_text)
+        .alignment(Alignment::Center)
+        .block(block);
+
+    f.render_widget(Clear, area);
+    f.render_widget(paragraph, chunks[1]);
 }

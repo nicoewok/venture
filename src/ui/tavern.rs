@@ -1,7 +1,6 @@
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
@@ -14,21 +13,21 @@ pub fn draw_tavern(f: &mut Frame, app: &mut App) {
         .margin(2)
         .constraints([
             Constraint::Length(11), // Tavern ASCII
-            Constraint::Length(9),  // Bounty Board (fixed height for 5-6 items)
-            Constraint::Min(3),     // Instructions / Extra space
+            Constraint::Fill(1),    // Bounty Board (takes available space)
+            Constraint::Length(3),  // Instructions
         ])
         .split(f.area());
 
     let tavern_ascii = r#"
-             _   _
-            ( )_( )
-             |   |
-          ____|___|____
-         |             |
-         |  THE RUSTY   |
-         |    ANVIL     |
-         |   [  _  ]    |
-         |    | | |     |
+        _   _   
+       ( )_( )  
+      |   |  
+    ____|___|_____
+    |              |
+    |  THE RUSTY   |
+    |    ANVIL     |
+    |   [  _  ]    |
+    |    | | |     |
     _____|____|_|_|_____|_____
     "#;
 
@@ -80,13 +79,9 @@ pub fn draw_tavern(f: &mut Frame, app: &mut App) {
 
     app.tavern_state.select(Some(app.cursor_pos));
 
-    let mut bounty_block = Block::default()
+    let bounty_block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" Bounty Board (Goal: {}) ", app.monsters_goal));
-    
-    if items.len() > 7 {
-        bounty_block = bounty_block.title_bottom(Line::from(" [...] ").alignment(Alignment::Center));
-    }
 
     let bounty_board = List::new(items)
         .block(bounty_block)

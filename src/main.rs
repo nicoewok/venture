@@ -44,12 +44,5 @@ fn main() -> Result<(), Box<dyn Error>> {
     crossterm::terminal::disable_raw_mode()?;
     crossterm::execute!(terminal.backend_mut(), crossterm::terminal::LeaveAlternateScreen)?;
 
-    if app.is_goal_reached() {
-        println!("\n\x1b[1;33m--- THE BARD'S TALE ---\x1b[0m");
-        println!("The Knight reached the Citadel after a long journey.");
-        println!("Monsters slain: \x1b[1;32m{}\x1b[0m", app.slain_count);
-        println!("The realm is safer thanks to your focus.\n");
-    }
-
     Ok(())
 }
