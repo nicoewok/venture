@@ -6,112 +6,15 @@ use ratatui::{
     Frame,
 };
 
-#[derive(Clone, Copy, Default, PartialEq)]
-pub enum CellType {
-    #[default]
-    Grass,
-    Path,
-    Tree,
-    Mountain,
-    River,
-    Bridge,
-}
+pub mod map;
+pub mod monster;
+pub mod tavern;
+pub mod castle;
 
-pub struct WorldMap {
-    pub width: u16,
-    pub height: u16,
-    pub grid: Vec<Vec<CellType>>,
-    pub path_steps: Vec<(u16, u16)>,
-}
+pub use map::{WorldMap, CellType};
 
 pub enum Animation {
     Slash { frame: usize },
-}
-
-impl WorldMap {
-    pub fn new(width: u16, height: u16) -> Self {
-        let mut grid = vec![vec![CellType::Grass; width as usize]; height as usize];
-        
-        let mut connected_path = Vec::new();
-        
-        // Start at bottom center
-        let mut walk_y = height as i32 - 1;
-        let mut walk_x = (width / 2) as i32;
-        
-        // End at top center
-        let target_x = (width / 2) as i32;
-        let target_y = 0;
-
-        connected_path.push((walk_x as u16, walk_y as u16));
-        grid[walk_y as usize][walk_x as usize] = CellType::Path;
-
-        while walk_y > target_y {
-            let total_dist = (height as i32 - 1) - target_y;
-            let current_dist = (height as i32 - 1) - walk_y;
-            let progress = current_dist as f32 / total_dist as f32;
-            
-            // Base sine wave for a winding path
-            let amplitude = 15.0; // Constant amplitude
-            let freq = 0.2;
-            let wave_offset = (amplitude * (walk_y as f32 * freq).sin()) as i32;
-            
-            // Linear interpolation from start_x to target_x
-            let start_base_x = (width / 2) as i32;
-            let base_x = start_base_x + ((target_x - start_base_x) as f32 * progress) as i32;
-            
-            let desired_x = base_x + wave_offset;
-            let desired_x = desired_x.clamp(2, (width as i32) - 3);
-
-            let dist_x = desired_x - walk_x;
-            
-            if dist_x != 0 {
-                if dist_x > 0 { walk_x += 1; } else { walk_x -= 1; }
-            } else {
-                walk_y -= 1;
-            }
-            
-            connected_path.push((walk_x as u16, walk_y as u16));
-            grid[walk_y as usize][walk_x as usize] = CellType::Path;
-        }
-
-        // Add rivers
-        for y_base in (15..height as usize - 5).step_by(30) {
-            let offset_seed = y_base as f32 * 0.1;
-            for x in 0..width as usize {
-                let y_offset = (2.0 * (x as f32 * 0.15 + offset_seed).sin()) as i32;
-                let y = (y_base as i32 + y_offset).clamp(0, height as i32 - 1) as usize;
-                
-                if grid[y][x] == CellType::Path {
-                    grid[y][x] = CellType::Bridge;
-                } else if grid[y][x] == CellType::Grass {
-                    grid[y][x] = CellType::River;
-                }
-            }
-        }
-
-        // Add some basic terrain (trees and mountains) procedurally with clustering
-        for y in 0..height as usize {
-            for x in 0..width as usize {
-                if grid[y][x] != CellType::Grass { continue; }
-                
-                let val = (x.wrapping_mul(37) ^ y.wrapping_mul(101)) % 100;
-                
-                // Tree clusters
-                let tree_cluster = ((x / 3).wrapping_mul(13) ^ (y / 3).wrapping_mul(7)) % 10;
-                if tree_cluster < 3 && val < 40 {
-                    grid[y][x] = CellType::Tree;
-                }
-                
-                // Mountain clusters
-                let mtn_cluster = ((x / 5).wrapping_mul(17) ^ (y / 5).wrapping_mul(11)) % 10;
-                if mtn_cluster < 2 && val < 30 {
-                    grid[y][x] = CellType::Mountain;
-                }
-            }
-        }
-
-        Self { width, height, grid, path_steps: connected_path }
-    }
 }
 
 use crate::app::{App, Scene};
@@ -123,16 +26,15 @@ const SLAIN: &str = "X";
 pub fn render(f: &mut Frame, app: &mut App) {
     match app.state {
         Scene::Setup => draw_setup(f, app),
-        Scene::Tavern => draw_tavern(f, app),
+        Scene::Tavern => tavern::draw_tavern(f, app),
         Scene::Naming => draw_naming(f, app),
         Scene::March => {
             let main_chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints(if f.area().width > 100 {
-                    [Constraint::Percentage(75), Constraint::Percentage(25)]
-                } else {
-                    [Constraint::Percentage(100), Constraint::Percentage(0)]
-                })
+                .constraints([
+                    Constraint::Percentage(70),
+                    Constraint::Percentage(30),
+                ])
                 .split(f.area());
 
             let left_chunks = Layout::default()
@@ -147,15 +49,14 @@ pub fn render(f: &mut Frame, app: &mut App) {
                 render_sidebar(f, app, main_chunks[1]);
             }
         }
-        Scene::Battle(idx) => render_battle(f, app, idx),
+        Scene::Battle(idx) => monster::render_battle(f, app, idx),
         Scene::Selection => {
             let main_chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints(if f.area().width > 100 {
-                    [Constraint::Percentage(75), Constraint::Percentage(25)]
-                } else {
-                    [Constraint::Percentage(100), Constraint::Percentage(0)]
-                })
+                .constraints([
+                    Constraint::Percentage(70),
+                    Constraint::Percentage(30),
+                ])
                 .split(f.area());
 
             let left_chunks = Layout::default()
@@ -230,98 +131,6 @@ pub fn draw_setup(f: &mut Frame, app: &mut App) {
     f.render_widget(footer, chunks[2]);
 }
 
-pub fn draw_tavern(f: &mut Frame, app: &mut App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints([
-            Constraint::Length(11), // Tavern ASCII
-            Constraint::Length(9),  // Bounty Board (fixed height for 5-6 items)
-            Constraint::Min(3),     // Instructions / Extra space
-        ])
-        .split(f.area());
-
-    let tavern_ascii = r#"
-             _   _
-            ( )_( )
-             |   |
-          ____|___|____
-         |             |
-         |  THE RUSTY   |
-         |    ANVIL     |
-         |   [  _  ]    |
-         |    | | |     |
-    _____|____|_|_|_____|_____
-    "#;
-
-    let title = Paragraph::new(tavern_ascii)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Yellow));
-    f.render_widget(title, chunks[0]);
-
-    let mut items: Vec<ListItem> = Vec::new();
-
-    // 1. Dotdo Tasks
-    for (i, task) in app.available_tasks.iter().enumerate() {
-        let style = Style::default();
-        let tagged = if app.selected_indices.contains(&i) { " [X] " } else { " [ ] " };
-        items.push(ListItem::new(format!("{}{}", tagged, task.title)).style(style));
-    }
-
-    // 2. Custom Monsters
-    let tasks_len = app.available_tasks.len();
-    for (_, name) in app.custom_monsters.iter().enumerate() {
-        let style = Style::default();
-        items.push(ListItem::new(format!(" [X] {}", name)).style(style));
-    }
-
-    // 3. [+] Button
-    let custom_len = app.custom_monsters.len();
-    let plus_idx = tasks_len + custom_len;
-    let plus_style = Style::default().fg(Color::Green);
-    items.push(ListItem::new(" [+] Add Custom Monster").style(plus_style));
-
-    // 4. [START QUEST] Button
-    let selected_count = app.selected_indices.len() + custom_len;
-    let can_start = selected_count == app.monsters_goal as usize;
-    
-    let start_style = if can_start {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
-    
-    let start_text = if can_start {
-        " [!] START QUEST ".to_string()
-    } else if selected_count > app.monsters_goal as usize {
-        format!(" [ ] TOO MANY MONSTERS (Selected: {})", selected_count)
-    } else {
-        format!(" [ ] START QUEST (Need {} more)", app.monsters_goal as usize - selected_count)
-    };
-    items.push(ListItem::new(start_text).style(start_style));
-
-    app.tavern_state.select(Some(app.cursor_pos));
-
-    let mut bounty_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" Bounty Board (Goal: {}) ", app.monsters_goal));
-    
-    if items.len() > 7 {
-        bounty_block = bounty_block.title_bottom(Line::from(" [...] ").alignment(Alignment::Center));
-    }
-
-    let bounty_board = List::new(items)
-        .block(bounty_block)
-        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::REVERSED))
-        .highlight_symbol("> ");
-    
-    f.render_stateful_widget(bounty_board, chunks[1], &mut app.tavern_state);
-
-    let instructions = Paragraph::new("[Up/Down] Navigate | [Space/Enter] Select/Action | [Q] Quit")
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::TOP));
-    f.render_widget(instructions, chunks[2]);
-}
 
 pub fn draw_naming(f: &mut Frame, app: &mut App) {
     let area = f.area();
@@ -392,20 +201,7 @@ pub fn render_march(f: &mut Frame, app: &mut App, area: Rect) {
         .split(area);
 
     // 1. CASTLE ART (Top of Map Area)
-    let castle_ascii = r#"
-             / \
-            |   |
-         _-'     '-_
-        |___________|
-         |         |
-     ____|_________|____
-    |                   |
-    |  _   _     _   _  |
-    | | |_| |   | |_| | |
-    | |_____|   |_____| |
-    |  |   |     |   |  |
-    |__|___|_____|___|__|
-    "#;
+    let castle_ascii = crate::ui::castle::CASTLE_ASCII;
     f.render_widget(
         Paragraph::new(castle_ascii)
             .alignment(Alignment::Center)
@@ -483,103 +279,10 @@ pub fn render_march(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .title(format!(" Adventure Map | Time Left: {} ", app.get_time_left()));
     
-    let map = Paragraph::new(lines).block(map_block);
+    let map = Paragraph::new(lines)
+        .block(map_block)
+        .alignment(Alignment::Center);
     f.render_widget(map, map_area);
-}
-
-
-
-pub fn render_battle(f: &mut Frame, app: &mut App, monster_idx: usize) {
-    let monster = &app.monsters[monster_idx];
-    let area = f.area();
-    
-    let monster_arts = vec![
-        r#"
-             (  )   (  )
-              ) (   ) (
-             (   ) (   )
-              \  | |  /
-               \ | | /
-              _(_|_|_)_
-             (_________)
-        "#,
-        r#"
-              / \__
-             (    @\___
-             /         O
-            /   (_____/
-           /_____/   U
-        "#,
-        r#"
-             .-"```"-.
-            /         \
-            | @   @   |
-            |   ^     |
-             \  -    /
-              '-...-'
-        "#,
-        r#"
-              _______
-             /       \
-            |  O   O  |
-            |    V    |
-             \_______/
-              /     \
-        "#,
-    ];
-
-    let monster_art = monster_arts[monster.art_idx % monster_arts.len()];
-
-    let mut art_lines: Vec<Line> = Vec::new();
-    let rows: Vec<&str> = monster_art.lines().collect();
-
-    for (y, row) in rows.iter().enumerate() {
-        let mut spans = Vec::new();
-        for (x, ch) in row.chars().enumerate() {
-            let mut style = Style::default();
-            let mut final_char = ch.to_string();
-
-            if let Some(crate::ui::Animation::Slash { frame, .. }) = app.animation {
-                // Animated Slash: Diagonal line of blocks moving across
-                let slash_pos = (frame * 3) as i32; // Adjusted speed
-                let dx = x as i32;
-                let dy = (y * 3) as i32; // Adjusted vertical spread
-                
-                if (dx - slash_pos).abs() < 2 && (dy - (dx * 2)).abs() < 15 {
-                     style = style.fg(Color::White).add_modifier(Modifier::BOLD);
-                     final_char = "█".to_string();
-                } else {
-                     style = style.fg(Color::Red);
-                }
-            } else if monster.is_slain {
-                style = style.fg(Color::DarkGray);
-            }
-
-            spans.push(Span::styled(final_char, style));
-        }
-        art_lines.push(Line::from(spans));
-    }
-
-    let text = format!(
-        "\n\nYOU ARE FIGHTING: {} [{}]\n\n[S] SLAY | [F] FLEE | [P] PAUSE | [Q] QUIT",
-        monster.name.to_uppercase(),
-        monster.monster_type.to_uppercase()
-    );
-
-    let mut final_content = art_lines;
-    final_content.push(Line::from(text));
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" BATTLE ")
-        .style(if app.animation.is_some() { Style::default().fg(Color::Red) } else { Style::default() });
-
-    f.render_widget(
-        Paragraph::new(final_content)
-            .alignment(Alignment::Center)
-            .block(block),
-        area,
-    );
 }
 
 
@@ -592,11 +295,11 @@ pub fn render_footer(f: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let status = if app.all_monsters_slain() {
-        format!("{}  ALL FOES VANQUISHED. YOU MAY COMPLETE THE QUEST.", KNIGHT)
+        format!("ALL FOES VANQUISHED. YOU MAY COMPLETE THE QUEST.")
     } else if app.is_goal_reached() {
-        format!("{}  YOU HAVE REACHED THE CITADEL. THE GATES ARE OPEN.", KNIGHT)
+        format!("YOU HAVE REACHED THE CASTLE. YOU MAY COMPLETE THE QUEST.")
     } else {
-        format!("{}  THE MARCH CONTINUES...", KNIGHT)
+        format!("THE MARCH CONTINUES...")
     };
 
     let footer = Paragraph::new(format!("{}\n{}", status, keys))
