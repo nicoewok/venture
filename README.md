@@ -7,15 +7,11 @@ Venture is a terminal-based productivity tool that gamifies your work sessions u
 
 ### Prerequisites
 *   **Rust:** You must have the [Rust toolchain](https://www.rust-lang.org/tools/install) installed.
-*   **Nerd Fonts (Recommended):** The TUI uses specific glyphs for the player and combat icons. Ensure your terminal is set to a Nerd Font (like JetBrainsMono or FiraCode) to see them correctly.
 *   **dotdo (Optional):** If you use [dotdo](https://github.com/nicolang0416/dotdo), another TUI app of mine, Venture will automatically pull your active tasks into the game.
 
-### Build and Run
-1. Clone the repository.
-2. Build and run the project:
-```bash
-cargo run
-```
+## Install (Linux)
+
+Download the deb file from the [releases](https://github.com/nicoewok/venture/releases) page and install it using `sudo apt install venture_*.deb`.
 
 ## The Gameplay Loop
 Venture is designed to stay open in a small terminal pane or side monitor while you work. The loop consists of four distinct phases:
@@ -56,13 +52,8 @@ The trail stops moving, but you can remain at the gates to finish off any remain
 * S: Open Slay menu / Slay monster.
 * F: Flee from battle.
 * P: Pause the march.
-* C: Complete quest (only available at the Citadel).
+* C: Complete quest (only available after beating all monsters or completing the march).
 * Q: Quit the application.
-
-## Built with
-
-* [ratatui](https://github.com/ratatui-org/ratatui)
-* [crossterm](https://github.com/crossterm-rs/crossterm)
 
 
 ### Dotdo integration
@@ -72,6 +63,15 @@ You can find it here: [https://github.com/nicolang0416/dotdo](https://github.com
 
 If you have dotdo installed, Venture will automatically get your active tasks and let's you select them as monsters when you start a session.
 
+
+### Build and Run
+If you want to build the project yourself:
+
+1. Clone the repository.
+2. Build and run the project:
+```bash
+cargo run
+```
 
 
 ### ASCII Art
